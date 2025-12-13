@@ -16,7 +16,7 @@ return function(Dungeon, Stuff)
     end
     -- =====================================
 
-    -- === Original Auto Farm logic (unchanged except fall-through fixes) ===
+    -- === Original Auto Farm logic (unchanged) ===
     local TweenService      = game:GetService("TweenService")
     local RunService        = game:GetService("RunService")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,89 +25,23 @@ return function(Dungeon, Stuff)
     task.wait(10)
     print("Auto Farm Script Loaded")
 
-    ----------------------------------------------------------------------
-    -- FALL-THROUGH FIX UTILITIES
-    ----------------------------------------------------------------------
-    -- Downward raycast that ignores the local character
-    local function getGroundBelow(origin, maxDist)
-        local params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        params.FilterDescendantsInstances = {Player.Character}
-        return workspace:Raycast(origin, Vector3.new(0, -maxDist, 0), params)
-    end
-
-    -- Track last safe ground position for anti-void rescue
-    local lastSafeCFrame = nil
-
-    -- Keep humanoid in a normal running state and HRP collidable
     RunService.Stepped:Connect(function()
-        local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            -- Do NOT force Physics; it makes CFrame/Tween movement clip through floors.
-            humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
-            humanoid.PlatformStand = false
-            humanoid:ChangeState(Enum.HumanoidStateType.Running)
-        end
-
-        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.Anchored = false
-            hrp.CanCollide = true
-        end
-    end)
-
-    -- Anti-void rescue: snap back to last safe ground if we fall below destroy height
-    RunService.Heartbeat:Connect(function()
-        local char = Player.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if not hrp or not hum then return end
-
-        local ground = getGroundBelow(hrp.Position, 250)
-        if ground then
-            lastSafeCFrame = CFrame.new(ground.Position + Vector3.new(0, 5, 0))
-        end
-
-        local destroyHeight = workspace.FallenPartsDestroyHeight or -500
-        if hrp.Position.Y < (destroyHeight + 25) then
-            if lastSafeCFrame then
-                hrp.CFrame = lastSafeCFrame
-                hum:ChangeState(Enum.HumanoidStateType.Landed)
-            else
-                -- Fallback if we have no recorded safe ground yet
-                hrp.CFrame = CFrame.new(hrp.Position.X, destroyHeight + 100, hrp.Position.Z)
-                hum:ChangeState(Enum.HumanoidStateType.Landed)
+        pcall(function()
+            local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Physics)
             end
-        end
+        end)
     end)
-    ----------------------------------------------------------------------
 
-    -- Safer movement to target: clamp destination Y to ground
     local function toTarget(startPos, targetPos, targetCFrame)
-        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-
-        -- Find ground under the target and keep destination slightly above it
-        local ground = getGroundBelow(targetPos + Vector3.new(0, 50, 0), 200)
-        local safeY
-        if ground then
-            safeY = ground.Position.Y + 4.5
-        else
-            -- If no ground detected, keep current Y to avoid tweening into the void
-            safeY = hrp.Position.Y
-        end
-
-        -- Preserve target rotation while using safe Y
-        local rx, ry, rz = targetCFrame:ToEulerAnglesXYZ()
-        local safeTargetCFrame = CFrame.new(Vector3.new(targetPos.X, safeY, targetPos.Z)) * CFrame.Angles(rx, ry, rz)
-
-        -- Duration proportional to distance (same as original)
         local tweenInfo = TweenInfo.new((targetPos - startPos).Magnitude / 80, Enum.EasingStyle.Quad)
         local ok, err = pcall(function()
-            hrp.CanCollide = true
-            hrp.Anchored = false
-            local tween = TweenService:Create(hrp, tweenInfo, {CFrame = safeTargetCFrame})
-            tween:Play()
+            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+                tween:Play()
+            end
         end)
         if not ok then warn(err) end
     end
@@ -179,11 +113,11 @@ return function(Dungeon, Stuff)
                                     end
                                 until enemy.Humanoid.Health <= 0
                                 attackCount = 0
-                                                       end
+                            end
                         end
                     end
                 end
             end
         end)
     end
-
+end
