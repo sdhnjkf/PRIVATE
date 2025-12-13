@@ -1,15 +1,35 @@
 
 -- PRIVATE PAYLOAD (RUMBLE)
+-- Keep this file private and obfuscate it.
 
--- Read config from globals set by the public script
-local Dungeon = rawget(_G, "Dungeon") or Dungeon or {}
-local Stuff   = rawget(_G, "Stuff")   or Stuff   or {}
+-- Try to resolve the config provided by the public script.
+-- We attempt multiple strategies to support various executors:
+local CFG_Dungeon, CFG_Stuff
+
+-- 1) If the public script promoted them to globals (or the executor exposes locals), read them:
+CFG_Dungeon = rawget(_G, "Dungeon") or Dungeon
+CFG_Stuff   = rawget(_G, "Stuff")   or Stuff
+
+-- 2) If the public script (or your environment) uses getgenv/shared:
+if (not CFG_Dungeon or not CFG_Stuff) and getgenv then
+    local g = getgenv()
+    CFG_Dungeon = CFG_Dungeon or g.Dungeon or (g.AF_CONFIG and g.AF_CONFIG.Dungeon)
+    CFG_Stuff   = CFG_Stuff   or g.Stuff   or (g.AF_CONFIG and g.AF_CONFIG.Stuff)
+end
+
+-- 3) Final fallback defaults if nothing was visible (keeps the script running)
+if not CFG_Dungeon then
+    CFG_Dungeon = { Difficulty = "Hard", PartyOnly = true, Hardcore = false, Location = "Jungle Temple" }
+end
+if not CFG_Stuff then
+    CFG_Stuff = { AutoSell = false, JoinHighestDungeon = true, RestartTime = 250 }
+end
 
 -- Ensure LocalPlayer exists
 repeat task.wait() until game.Players and game.Players.LocalPlayer
 local Player = game.Players.LocalPlayer
 
--- ========= PRIVATE WHITELIST =========
+-- ========= PRIVATE WHITELIST (hidden here) =========
 local Allowed = {
     [3103840569] = true, -- replace with your IDs
     [5036814396] = true,
@@ -18,13 +38,15 @@ if not Allowed[Player.UserId] then
     Player:Kick("Access denied: you are not authorized to run this script.")
     return
 end
--- =====================================
+-- ================================================
+
+-- Your original logic (unchanged)
 
 -- SERVICES
 local TweenService      = game:GetService("TweenService")
 local RunService        = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TeleportService   = game:GetService("TeleportService")
+local Teleportlocal TeleportService   = game:GetService("TeleportService")
 
 wait(10)
 print("Auto Farm Script Loaded")
@@ -51,7 +73,7 @@ end
 
 -- AutoSell Function
 local function autoSell()
-    if Stuff.AutoSell and game.workspace:FindFirstChild("Lobby") then
+    if CFG_Stuff.AutoSell and game.workspace:FindFirstChild("Lobby") then
         Player.Character.HumanoidRootPart.CFrame = CFrame.new(-418.266968, 25.2, 408.361694)
         for _, item in pairs(Player.PlayerGui.ScreenGui.Sell.Sell.Inner.Items.Frame.Items:GetChildren()) do
             if item.Name ~= "UIGridLayout" and not item.Equipped.Visible and not item.RarityBackground.Visible then
@@ -63,7 +85,7 @@ local function autoSell()
     end
 end
 
--- Dungeon Creation (original behavior)
+-- Dungeon Creation (same as your original)
 spawn(function()
     while wait() do
         pcall(function()
@@ -71,7 +93,7 @@ spawn(function()
                 autoSell()
                 local create = "CreateLobby"
                 local start  = "StartDungeon"
-                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer(create, Dungeon)
+                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer(create, CFG_Dungeon)
                 ReplicatedStorage.Modules.Network.RemoteEvent:FireServer(start)
             end
         end)
@@ -84,7 +106,7 @@ spawn(function()
     while wait(1) do
         if not game.workspace:FindFirstChild("Lobby") then
             Time = Time + 1
-            if Time >= Stuff.RestartTime then
+            if Time >= CFG_Stuff.RestartTime then
                 TeleportService:Teleport(4390380541, Player)
             end
         end
@@ -106,8 +128,9 @@ while wait() do
                                 toTarget(
                                     Player.Character.HumanoidRootPart.Position,
                                     enemy.HumanoidRootPart.Position,
-                                    enemy.HumanoidRootPart.CFrame * CFrame.new(                                    enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                                    enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
                                 )
+
                                 -- Attack enemy
                                 local remoteEvent = ReplicatedStorage.Modules.Network.RemoteEvent
                                 for i = 1, 10 do
