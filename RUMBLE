@@ -29,7 +29,17 @@ return function(Dungeon, Stuff)
         pcall(function()
             local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
             if humanoid then
-                humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+                -- FALL FIX: do not force Physics; keep normal running so collisions with floor are respected
+                humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
+                humanoid.PlatformStand = false
+                humanoid:ChangeState(Enum.HumanoidStateType.Running)
+            end
+
+            -- Ensure HRP is collidable and not anchored so it doesn't clip through parts while tweening
+            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.Anchored = false
+                hrp.CanCollide = true
             end
         end)
     end)
@@ -92,7 +102,7 @@ return function(Dungeon, Stuff)
     while task.wait() do
         pcall(function()
             if Player.Character and not game.workspace:FindFirstChild("Lobby") then
-                for _, weaponModel in pairs(Player.Character:GetChildren()) do
+                               for _, weaponModel in pairs(Player.Character:GetChildren()) do
                     if weaponModel:IsA("Model") then
                         for _, enemy in pairs(game.workspace.Enemies:GetChildren()) do
                             if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
@@ -120,4 +130,4 @@ return function(Dungeon, Stuff)
             end
         end)
     end
-end
+
