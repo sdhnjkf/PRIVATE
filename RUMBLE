@@ -5,16 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 
 wait(10)
-
--- ===== WHITELIST (ONLY these two UIDs allowed) =====
-local uid = Player.UserId
-if uid == 3103840569 or uid == 5036814396 then
-    print("Auto Farm Script Loaded")
-else
-    Player:Kick("Access denied: you are not authorized to run this script.")
-    return
-end
--- ===== END WHITELIST =====
+print("Auto Farm Script Loaded")
 
 -- Anti-Fall Protection
 RunService.Stepped:Connect(function()
@@ -30,113 +21,50 @@ end)
 local function toTarget(startPos, targetPos, targetCFrame)
     local tweenInfo = TweenInfo.new((targetPos - startPos).Magnitude / 80, Enum.EasingStyle.Quad)
     local success, err = pcall(function()
-        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
-            tween:Play()
-        end
+        local tween = TweenService:Create(Player.Character.HumanoidRootPart, tweenInfo, {CFrame = targetCFrame})
+        tween:Play()
     end)
     if not success then warn(err) end
 end
 
 -- AutoSell Function
 local function autoSell()
-    if Stuff.AutoSell and workspace:FindFirstChild("Lobby") then
-        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.CFrame = CFrame.new(-418.266968, 25.2, 408.361694)
-        end
-        local itemsFrame = Player.PlayerGui
-            and Player.PlayerGui:FindFirstChild("ScreenGui")
-            and Player.PlayerGui.ScreenGui:FindFirstChild("Sell")
-            and Player.PlayerGui.ScreenGui.Sell:FindFirstChild("Sell")
-            and Player.PlayerGui.ScreenGui.Sell.Sell:FindFirstChild("Inner")
-            and Player.PlayerGui.ScreenGui.Sell.Sell.Inner:FindFirstChild("Items")
-            and Player.PlayerGui.ScreenGui.Sell.Sell.Inner.Items:FindFirstChild("Frame")
-            and Player.PlayerGui.ScreenGui.Sell.Sell.Inner.Items.Frame:FindFirstChild("Items")
-
-        if itemsFrame then
-            for _, item in pairs(itemsFrame:GetChildren()) do
-                if item.Name ~= "UIGridLayout"
-                    and item:FindFirstChild("Equipped") and not item.Equipped.Visible
-                    and item:FindFirstChild("RarityBackground") and not item.RarityBackground.Visible then
-
-                    local rf = ReplicatedStorage:FindFirstChild("Modules")
-                        and ReplicatedStorage.Modules:FindFirstChild("Network")
-                        and ReplicatedStorage.Modules.Network:FindFirstChild("RemoteFunction")
-
-                    if rf then
-                        rf:InvokeServer("SellItems", {{"Weapon", item.Name}})
-                        rf:InvokeServer("SellItems", {{"Armor", item.Name}})
-                        rf:InvokeServer("SellItems", {{"Ability", item.Name}})
-                    end
-                end
+    if Stuff.AutoSell and game.workspace:FindFirstChild("Lobby") then
+        Player.Character.HumanoidRootPart.CFrame = CFrame.new(-418.266968, 25.2, 408.361694)
+        for _, item in pairs(Player.PlayerGui.ScreenGui.Sell.Sell.Inner.Items.Frame.Items:GetChildren()) do
+            if item.Name ~= "UIGridLayout" and not item.Equipped.Visible and not item.RarityBackground.Visible then
+                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer("SellItems", {{"Weapon", item.Name}})
+                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer("SellItems", {{"Armor", item.Name}})
+                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer("SellItems", {{"Ability", item.Name}})
             end
         end
     end
 end
 
--- ===== Dungeon Creation (debounced, start after create) =====
-do
-    local creating = false
-    spawn(function()
-        while wait(1) do
-            pcall(function()
-                if workspace:FindFirstChild("Lobby") and not creating then
-                    creating = true
-
-                    -- Optional sell first
-                    autoSell()
-
-                    local network = ReplicatedStorage:FindFirstChild("Modules")
-                        and ReplicatedStorage.Modules:FindFirstChild("Network")
-                    local rf = network and network:FindFirstChild("RemoteFunction")
-                    local re = network and network:FindFirstChild("RemoteEvent")
-
-                    if rf and re then
-                        -- Create lobby once
-                        local okCreate, result = pcall(function()
-                            return rf:InvokeServer("CreateLobby", Dungeon)
-                        end)
-                        if not okCreate then
-                            warn("[Dungeon] CreateLobby failed: ", result)
-                            creating = false
-                        else
-                            -- Give the server a moment to establish the lobby
-                            wait(0.5)
-                            local okStart, errStart = pcall(function()
-                                re:FireServer("StartDungeon")
-                            end)
-                            if not okStart then
-                                warn("[Dungeon] StartDungeon failed: ", errStart)
-                            end
-                        end
-                    else
-                        warn("[Dungeon] ReplicatedStorage.Modules.Network remotes not found")
-                    end
-
-                    -- Avoid spamming the server
-                    wait(2)
-                    creating = false
-                end
-            end)
-        end
-    end)
-end
--- ===== END Dungeon Creation =====
+-- Dungeon Creation
+spawn(function()
+    while wait() do
+        pcall(function()
+            if game.workspace:FindFirstChild("Lobby") then
+                autoSell()
+                local create = "CreateLobby"
+                local start = "StartDungeon"
+                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer(create, Dungeon)
+                ReplicatedStorage.Modules.Network.RemoteEvent:FireServer(start)
+            end
+        end)
+    end
+end)
 
 -- Restart Timer
 local Time = 0
 spawn(function()
     while wait(1) do
-        if not workspace:FindFirstChild("Lobby") then
+        if not game.workspace:FindFirstChild("Lobby") then
             Time = Time + 1
             if Time >= Stuff.RestartTime then
                 TeleportService:Teleport(4390380541, Player)
             end
-        else
-            -- Reset when back in lobby
-            Time = 0
         end
     end
 end)
@@ -145,42 +73,32 @@ end)
 local attackCount = 0
 while wait() do
     pcall(function()
-        if Player.Character and not workspace:FindFirstChild("Lobby") then
+        if Player.Character and not game.workspace:FindFirstChild("Lobby") then
             for _, weaponModel in pairs(Player.Character:GetChildren()) do
                 if weaponModel:IsA("Model") then
-                    local enemiesFolder = workspace:FindFirstChild("Enemies")
-                    if enemiesFolder then
-                        for _, enemy in pairs(enemiesFolder:GetChildren()) do
-                            if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
-                                repeat
-                                    attackCount = attackCount + 1
-                                    -- Float ABOVE enemy (change 5 to adjust height)
-                                    toTarget(
-                                        Player.Character.HumanoidRootPart.Position,
-                                        enemy.HumanoidRootPart.Position,
-                                        enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
-                                                                       )
-                                    
-                                    -- Attack enemy
-                                    local remoteEvent = ReplicatedStorage:FindFirstChild("Modules")
-                                        and ReplicatedStorage.Modules:FindFirstChild("Network")
-                                        and ReplicatedStorage.Modules.Network:FindFirstChild("RemoteEvent")
-                                    if remoteEvent then
-                                        for i = 1, 10 do
-                                            remoteEvent:FireServer("WeaponDamage", weaponModel.Name, enemy.Humanoid)
-                                        end
-                                    end
-                                    
-                                    wait()
-                                    if attackCount >= 100 then
-                                        enemy.Humanoid.Health = 0
-                                    end
-                                until enemy.Humanoid.Health <= 0
-                                attackCount = 0
-                            end
+                    for _, enemy in pairs(game.workspace.Enemies:GetChildren()) do
+                        if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
+                            repeat
+                                attackCount = attackCount + 1
+                                -- Float ABOVE enemy (change 5 to adjust height)
+                                toTarget(Player.Character.HumanoidRootPart.Position, enemy.HumanoidRootPart.Position, enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0))
+                                
+                                -- Attack enemy
+                                local remoteEvent = ReplicatedStorage.Modules.Network.RemoteEvent
+                                for i = 1, 10 do
+                                    remoteEvent:FireServer("WeaponDamage", weaponModel.Name, enemy.Humanoid)
+                                end
+                                
+                                wait()
+                                if attackCount >= 100 then
+                                    enemy.Humanoid.Health = 0
+                                end
+                            until enemy.Humanoid.Health <= 0
+                            attackCount = 0
                         end
                     end
                 end
             end
         end
     end)
+end
