@@ -16,7 +16,7 @@ return function(Dungeon, Stuff)
     end
     -- =====================================
 
-    -- === Original Auto Farm logic (unchanged) ===
+    -- === Original Auto Farm logic (unchanged except fall-through fixes) ===
     local TweenService      = game:GetService("TweenService")
     local RunService        = game:GetService("RunService")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -25,22 +25,165 @@ return function(Dungeon, Stuff)
     task.wait(10)
     print("Auto Farm Script Loaded")
 
-    RunService.Stepped:Connect(function()
-        pcall(function()
-            local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                -- FALL FIX: don't force Physics; keep normal running so floor collisions work
-                humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
-                humanoid.PlatformStand = false
-                humanoid:ChangeState(Enum.HumanoidStateType.Running)
-            end
+    ----------------------------------------------------------------------
+    -- FALL-THROUGH FIX UTILITIES
+    ----------------------------------------------------------------------
+    -- Downward raycast that ignores the local character
+    local function getGroundBelow(origin, maxDist)
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        params.FilterDescendantsInstances = {Player.Character}
+        return workspace:Raycast(origin, Vector3.new(0, -maxDist, 0), params)
+    end
 
-            -- Ensure HRP is collidable while moving so it doesn't clip through parts
+    -- Track last safe ground position for anti-void rescue
+    local lastSafeCFrame = nil
+
+    -- Keep humanoid in a normal running state and HRP collidable
+    RunService.Stepped:Connect(function()
+        local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            -- Do NOT force Physics; it makes CFrame/Tween movement clip through floors.
+            humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
+            humanoid.PlatformStand = false
+            humanoid:ChangeState(Enum.HumanoidStateType.Running)
+        end
+
+        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.Anchored = false
+            hrp.CanCollide = true
+        end
+    end)
+
+    -- Anti-void rescue: snap back to last safe ground if we fall below destroy height
+    RunService.Heartbeat:Connect(function()
+        local char = Player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
+
+        local ground = getGroundBelow(hrp.Position, 250)
+        if ground then
+            lastSafeCFrame = CFrame.new(ground.Position + Vector3.new(0, 5, 0))
+        end
+
+        local destroyHeight = workspace.FallenPartsDestroyHeight or -500
+        if hrp.Position.Y < (destroyHeight + 25) then
+            if lastSafeCFrame then
+                hrp.CFrame = lastSafeCFrame
+                hum:ChangeState(Enum.HumanoidStateType.Landed)
+            else
+                -- Fallback if we have no recorded safe ground yet
+                hrp.CFrame = CFrame.new(hrp.Position.X, destroyHeight + 100, hrp.Position.Z)
+                hum:ChangeState(Enum.HumanoidStateType.Landed)
+            end
+        end
+    end)
+    ----------------------------------------------------------------------
+
+    -- Safer movement to target: clamp destination Y to ground
+    local function toTarget(startPos, targetPos, targetCFrame)
+        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        -- Find ground under the target and keep destination slightly above it
+        local ground = getGroundBelow(targetPos + Vector3.new(0, 50, 0), 200)
+        local safeY
+        if ground then
+            safeY = ground.Position.Y + 4.5
+        else
+            -- If no ground detected, keep current Y to avoid tweening into the void
+            safeY = hrp.Position.Y
+        end
+
+        -- Preserve target rotation while using safe Y
+        local rx, ry, rz = targetCFrame:ToEulerAnglesXYZ()
+        local safeTargetCFrame = CFrame.new(Vector3.new(targetPos.X, safeY, targetPos.Z)) * CFrame.Angles(rx, ry, rz)
+
+        -- Duration proportional to distance (same as original)
+        local tweenInfo = TweenInfo.new((targetPos - startPos).Magnitude / 80, Enum.EasingStyle.Quad)
+        local ok, err = pcall(function()
+            hrp.CanCollide = true
+            hrp.Anchored = false
+            local tween = TweenService:Create(hrp, tweenInfo, {CFrame = safeTargetCFrame})
+            tween:Play()
+        end)
+        if not ok then warn(err) end
+    end
+
+    local function autoSell()
+        if Stuff.AutoSell and game.workspace:FindFirstChild("Lobby") then
             local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
-                hrp.Anchored = false
-                hrp.CanCollide = true
+                hrp.CFrame = CFrame.new(-418.266968, 25.2, 408.361694)
+            end
+            local itemsFrame = Player.PlayerGui.ScreenGui.Sell.Sell.Inner.Items.Frame.Items
+            for _, item in pairs(itemsFrame:GetChildren()) do
+                if item.Name ~= "UIGridLayout" and not item.Equipped.Visible and not item.RarityBackground.Visible then
+                    local rf = ReplicatedStorage.Modules.Network.RemoteFunction
+                    rf:InvokeServer("SellItems", {{"Weapon", item.Name}})
+                    rf:InvokeServer("SellItems", {{"Armor", item.Name}})
+                    rf:InvokeServer("SellItems", {{"Ability", item.Name}})
+                end
+            end
+        end
+    end
+
+    task.spawn(function()
+        while task.wait() do
+            pcall(function()
+                if game.workspace:FindFirstChild("Lobby") then
+                    autoSell()
+                    ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer("CreateLobby", Dungeon)
+                    ReplicatedStorage.Modules.Network.RemoteEvent:FireServer("StartDungeon")
+                end
+            end)
+        end
+    end)
+
+    local Time = 0
+    task.spawn(function()
+        while task.wait(1) do
+            if not game.workspace:FindFirstChild("Lobby") then
+                Time += 1
+                if Time >= Stuff.RestartTime then
+                    TeleportService:Teleport(4390380541, Player)
+                end
+            end
+        end
+    end)
+
+    local attackCount = 0
+    while task.wait() do
+        pcall(function()
+            if Player.Character and not game.workspace:FindFirstChild("Lobby") then
+                for _, weaponModel in pairs(Player.Character:GetChildren()) do
+                    if weaponModel:IsA("Model") then
+                        for _, enemy in pairs(game.workspace.Enemies:GetChildren()) do
+                            if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
+                                repeat
+                                    attackCount += 1
+                                    toTarget(
+                                        Player.Character.HumanoidRootPart.Position,
+                                        enemy.HumanoidRootPart.Position,
+                                        enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                                    )
+                                    local remoteEvent = ReplicatedStorage.Modules.Network.RemoteEvent
+                                    for i = 1, 10 do
+                                        remoteEvent:FireServer("WeaponDamage", weaponModel.Name, enemy.Humanoid)
+                                    end
+                                    task.wait()
+                                    if attackCount >= 100 then
+                                        enemy.Humanoid.Health = 0
+                                    end
+                                until enemy.Humanoid.Health <= 0
+                                attackCount = 0
+                                                       end
+                        end
+                    end
+                end
             end
         end)
-       end)
+    end
 
