@@ -1,6 +1,5 @@
 
 -- PRIVATE PAYLOAD (RUMBLE)
--- This file goes in your private GitHub repo and should be obfuscated.
 
 -- Read config from globals set by the public script
 local Dungeon = rawget(_G, "Dungeon") or Dungeon or {}
@@ -12,7 +11,7 @@ local Player = game.Players.LocalPlayer
 
 -- ========= PRIVATE WHITELIST =========
 local Allowed = {
-    [3805299174] = true, -- Add your UserIds here
+    [3103840569] = true, -- replace with your IDs
     [5036814396] = true,
 }
 if not Allowed[Player.UserId] then
@@ -21,11 +20,11 @@ if not Allowed[Player.UserId] then
 end
 -- =====================================
 
--- Original Auto Farm Logic
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
+-- SERVICES
+local TweenService      = game:GetService("TweenService")
+local RunService        = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TeleportService = game:GetService("TeleportService")
+local TeleportService   = game:GetService("TeleportService")
 
 wait(10)
 print("Auto Farm Script Loaded")
@@ -43,11 +42,11 @@ end)
 -- Tween Movement Function
 local function toTarget(startPos, targetPos, targetCFrame)
     local tweenInfo = TweenInfo.new((targetPos - startPos).Magnitude / 80, Enum.EasingStyle.Quad)
-    local success, err = pcall(function()
+    local ok, err = pcall(function()
         local tween = TweenService:Create(Player.Character.HumanoidRootPart, tweenInfo, {CFrame = targetCFrame})
         tween:Play()
     end)
-    if not success then warn(err) end
+    if not ok then warn(err) end
 end
 
 -- AutoSell Function
@@ -64,14 +63,14 @@ local function autoSell()
     end
 end
 
--- Dungeon Creation
+-- Dungeon Creation (original behavior)
 spawn(function()
     while wait() do
         pcall(function()
             if game.workspace:FindFirstChild("Lobby") then
                 autoSell()
                 local create = "CreateLobby"
-                local start = "StartDungeon"
+                local start  = "StartDungeon"
                 ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer(create, Dungeon)
                 ReplicatedStorage.Modules.Network.RemoteEvent:FireServer(start)
             end
@@ -103,20 +102,25 @@ while wait() do
                         if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
                             repeat
                                 attackCount = attackCount + 1
-                                toTarget(Player.Character.HumanoidRootPart.Position, enemy.HumanoidRootPart.Position, enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0))
-                                
+                                -- Float ABOVE enemy (change 5 to adjust height)
+                                toTarget(
+                                    Player.Character.HumanoidRootPart.Position,
+                                    enemy.HumanoidRootPart.Position,
+                                    enemy.HumanoidRootPart.CFrame * CFrame.new(                                    enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                                )
+                                -- Attack enemy
                                 local remoteEvent = ReplicatedStorage.Modules.Network.RemoteEvent
                                 for i = 1, 10 do
                                     remoteEvent:FireServer("WeaponDamage", weaponModel.Name, enemy.Humanoid)
                                 end
-                                
+
                                 wait()
                                 if attackCount >= 100 then
                                     enemy.Humanoid.Health = 0
                                 end
                             until enemy.Humanoid.Health <= 0
                             attackCount = 0
-                                               end
+                        end
                     end
                 end
             end
