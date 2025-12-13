@@ -1,4 +1,3 @@
-repeat task.wait() until game.Players.LocalPlayer
 local Player = game.Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -7,19 +6,20 @@ local TeleportService = game:GetService("TeleportService")
 
 wait(10)
 
--- UserId whitelist check (only these two allowed)
+-- ===== WHITELIST (ONLY these two UIDs allowed) =====
 local uid = Player.UserId
-if uid == 3103840569 or uid == 5036814396 then
+if uid == 3805299174 or uid == 5036814396 then
     print("Auto Farm Script Loaded")
 else
-    Player:Kick("Access denied: you are not authorized to run this scriptwwwwwwww.")
+    Player:Kick("Access denied: you are not authorized to run this script.")
     return
 end
+-- ===== END WHITELIST =====
 
 -- Anti-Fall Protection
 RunService.Stepped:Connect(function()
     pcall(function()
-        local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
         if humanoid then
             humanoid:ChangeState(Enum.HumanoidStateType.Physics)
         end
@@ -76,17 +76,16 @@ local function autoSell()
     end
 end
 
--- Dungeon Creation (debounced + response-aware)
+-- ===== Dungeon Creation (debounced, start after create) =====
 do
     local creating = false
-    task.spawn(function()
-        while task.wait(1.0) do
+    spawn(function()
+        while wait(1) do
             pcall(function()
-                -- Only act while in Lobby
                 if workspace:FindFirstChild("Lobby") and not creating then
                     creating = true
 
-                    -- Sell first if enabled
+                    -- Optional sell first
                     autoSell()
 
                     local network = ReplicatedStorage:FindFirstChild("Modules")
@@ -95,50 +94,48 @@ do
                     local re = network and network:FindFirstChild("RemoteEvent")
 
                     if rf and re then
-                        -- Try to create lobby
+                        -- Create lobby once
                         local okCreate, result = pcall(function()
                             return rf:InvokeServer("CreateLobby", Dungeon)
                         end)
                         if not okCreate then
                             warn("[Dungeon] CreateLobby failed: ", result)
                             creating = false
-                            continue
-                        end
-
-                        -- Small delay to let server set up lobby
-                        task.wait(0.5)
-
-                        -- Try to start dungeon
-                        local okStart, errStart = pcall(function()
-                            re:FireServer("StartDungeon")
-                        end)
-                        if not okStart then
-                            warn("[Dungeon] StartDungeon failed: ", errStart)
+                        else
+                            -- Give the server a moment to establish the lobby
+                            wait(0.5)
+                            local okStart, errStart = pcall(function()
+                                re:FireServer("StartDungeon")
+                            end)
+                            if not okStart then
+                                warn("[Dungeon] StartDungeon failed: ", errStart)
+                            end
                         end
                     else
-                        warn("[Dungeon] Network RemoteFunction/RemoteEvent not found at ReplicatedStorage.Modules.Network")
+                        warn("[Dungeon] ReplicatedStorage.Modules.Network remotes not found")
                     end
 
-                    -- Prevent spamming: wait a bit before next attempt
-                    task.wait(3)
+                    -- Avoid spamming the server
+                    wait(2)
                     creating = false
                 end
             end)
         end
     end)
 end
+-- ===== END Dungeon Creation =====
 
 -- Restart Timer
 local Time = 0
-task.spawn(function()
-    while task.wait(1) do
+spawn(function()
+    while wait(1) do
         if not workspace:FindFirstChild("Lobby") then
             Time = Time + 1
             if Time >= Stuff.RestartTime then
                 TeleportService:Teleport(4390380541, Player)
             end
         else
-            -- Reset the timer if back in lobby
+            -- Reset when back in lobby
             Time = 0
         end
     end
@@ -146,38 +143,41 @@ end)
 
 -- Enemy Farming
 local attackCount = 0
-while task.wait() do
+while wait() do
     pcall(function()
         if Player.Character and not workspace:FindFirstChild("Lobby") then
             for _, weaponModel in pairs(Player.Character:GetChildren()) do
                 if weaponModel:IsA("Model") then
-                    for _, enemy in pairs(workspace:FindFirstChild("Enemies") and workspace.Enemies:GetChildren() or {}) do
-                        if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
-                            repeat
-                                attackCount = attackCount + 1
-                                -- Float ABOVE enemy (change 5 to adjust height)
-                                toTarget(
-                                    Player.Character.HumanoidRootPart.Position,
-                                    enemy.HumanoidRootPart.Position,
-                                    enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
-                                )
-
-                                                               -- Attack enemy
-                                local re = ReplicatedStorage:FindFirstChild("Modules")
-                                    and ReplicatedStorage.Modules:FindFirstChild("Network")
-                                    and ReplicatedStorage.Modules.Network:FindFirstChild("RemoteEvent")
-                                if re then
-                                    for i = 1, 10 do
-                                        re:FireServer("WeaponDamage", weaponModel.Name, enemy.Humanoid)
+                    local enemiesFolder = workspace:FindFirstChild("Enemies")
+                    if enemiesFolder then
+                        for _, enemy in pairs(enemiesFolder:GetChildren()) do
+                            if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
+                                repeat
+                                    attackCount = attackCount + 1
+                                    -- Float ABOVE enemy (change 5 to adjust height)
+                                    toTarget(
+                                        Player.Character.HumanoidRootPart.Position,
+                                        enemy.HumanoidRootPart.Position,
+                                        enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                                                                       )
+                                    
+                                    -- Attack enemy
+                                    local remoteEvent = ReplicatedStorage:FindFirstChild("Modules")
+                                        and ReplicatedStorage.Modules:FindFirstChild("Network")
+                                        and ReplicatedStorage.Modules.Network:FindFirstChild("RemoteEvent")
+                                    if remoteEvent then
+                                        for i = 1, 10 do
+                                            remoteEvent:FireServer("WeaponDamage", weaponModel.Name, enemy.Humanoid)
+                                        end
                                     end
-                                end
-
-                                task.wait()
-                                if attackCount >= 100 then
-                                    enemy.Humanoid.Health = 0
-                                end
-                            until enemy.Humanoid.Health <= 0
-                            attackCount = 0
+                                    
+                                    wait()
+                                    if attackCount >= 100 then
+                                        enemy.Humanoid.Health = 0
+                                    end
+                                until enemy.Humanoid.Health <= 0
+                                attackCount = 0
+                            end
                         end
                     end
                 end
