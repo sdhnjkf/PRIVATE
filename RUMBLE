@@ -8,7 +8,7 @@ wait(10)
 
 -- ===== WHITELIST (ONLY these two UIDs allowed) =====
 local uid = Player.UserId
-if uid == 3805299174 or uid == 5036814396 then
+if uid == 3103840569 or uid == 5036814396 then
     print("Auto Farm Script Loaded")
 else
     Player:Kick("Access denied: you are not authorized to run this script.")
