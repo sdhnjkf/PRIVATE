@@ -1,8 +1,8 @@
 
--- RUMBLE (private payload) — keep this private and obfuscate it.
--- Reads config from globals set by the public script, then runs original logic.
+-- PRIVATE PAYLOAD (RUMBLE)
+-- This file goes in your private GitHub repo and should be obfuscated.
 
--- Read config (globals created by public script)
+-- Read config from globals set by the public script
 local Dungeon = rawget(_G, "Dungeon") or Dungeon or {}
 local Stuff   = rawget(_G, "Stuff")   or Stuff   or {}
 
@@ -10,42 +10,30 @@ local Stuff   = rawget(_G, "Stuff")   or Stuff   or {}
 repeat task.wait() until game.Players and game.Players.LocalPlayer
 local Player = game.Players.LocalPlayer
 
--- ========= PRIVATE WHITELIST (UserId only) =========
--- Only these UserIds may run the script
+-- ========= PRIVATE WHITELIST =========
 local Allowed = {
-    [3103840569] = true,
+    [3805299174] = true, -- Add your UserIds here
     [5036814396] = true,
 }
 if not Allowed[Player.UserId] then
     Player:Kick("Access denied: you are not authorized to run this script.")
     return
 end
--- ========= END PRIVATE WHITELIST ====================
+-- =====================================
 
---[[ 
-Auto Farm Script (Improved)
-Features:
-✔ Floats above enemies (no falling under map)
-✔ Auto attack enemies
-✔ Anti-fall protection
-✔ Auto dungeon creation
-✔ AutoSell
-]]
-
--- SERVICES
+-- Original Auto Farm Logic
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 
--- Startup
 wait(10)
 print("Auto Farm Script Loaded")
 
 -- Anti-Fall Protection
 RunService.Stepped:Connect(function()
     pcall(function()
-        local humanoid = Player        local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
+        local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
         if humanoid then
             humanoid:ChangeState(Enum.HumanoidStateType.Physics)
         end
@@ -76,7 +64,7 @@ local function autoSell()
     end
 end
 
--- Dungeon Creation (original behavior)
+-- Dungeon Creation
 spawn(function()
     while wait() do
         pcall(function()
@@ -115,10 +103,8 @@ while wait() do
                         if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
                             repeat
                                 attackCount = attackCount + 1
-                                -- Float ABOVE enemy (change 5 to adjust height)
                                 toTarget(Player.Character.HumanoidRootPart.Position, enemy.HumanoidRootPart.Position, enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0))
                                 
-                                -- Attack enemy
                                 local remoteEvent = ReplicatedStorage.Modules.Network.RemoteEvent
                                 for i = 1, 10 do
                                     remoteEvent:FireServer("WeaponDamage", weaponModel.Name, enemy.Humanoid)
@@ -130,9 +116,10 @@ while wait() do
                                 end
                             until enemy.Humanoid.Health <= 0
                             attackCount = 0
-                        end
+                                               end
                     end
                 end
             end
         end
     end)
+
