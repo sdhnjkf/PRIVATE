@@ -7,7 +7,7 @@ return function(Dungeon, Stuff)
 
     -- ========= PRIVATE WHITELIST =========
     local Allowed = {
-        [310384056] = true, -- replace with your IDs
+        [3103840569] = true, -- replace with your IDs
         [5036814396] = true,
     }
     if not Allowed[Player.UserId] then
