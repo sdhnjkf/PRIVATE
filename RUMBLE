@@ -33,14 +33,16 @@ local TeleportService   = game:GetService("TeleportService")
 task.wait(10)
 print("Auto Farm Script Loaded")
 
+-- Anti-Fall Protection
 RunService.Stepped:Connect(function()
     pcall(function()
-        local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+        local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
         if humanoid then
             humanoid:ChangeState(Enum.HumanoidStateType.Physics)
         end
     end)
 end)
+
 
 local function toTarget(startPos, targetPos, targetCFrame)
     local tweenInfo = TweenInfo.new((targetPos - startPos).Magnitude / 80, Enum.EasingStyle.Quad)
