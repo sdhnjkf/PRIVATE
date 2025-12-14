@@ -1,133 +1,124 @@
 
--- PRIVATE: RUMBLE_ENV — reads config from getgenv/_G; keep private and obfuscate
+-- PRIVATE: RUMBLE (returns a function) — keep this file private and obfuscate if you want
+return function(Dungeon, Stuff)
+    -- Ensure LocalPlayer exists
+    repeat task.wait() until game.Players and game.Players.LocalPlayer
+    local Player = game.Players.LocalPlayer
 
--- Resolve config from shared environment
-local Dungeon = (getgenv and getgenv().Dungeon) or _G.Dungeon or {
-    Difficulty = "Hard", PartyOnly = true, Hardcore = false, Location = "Jungle Temple"
-}
-local Stuff   = (getgenv and getgenv().Stuff)   or _G.Stuff   or {
-    AutoSell = false, JoinHighestDungeon = true, RestartTime = 250
-}
-
--- Ensure LocalPlayer exists
-repeat task.wait() until game.Players and game.Players.LocalPlayer
-local Player = game.Players.LocalPlayer
-
--- ========= PRIVATE WHITELIST =========
-local Allowed = {
-    [4070969815] = true, -- replace with your IDs
-    [5036814396] = true,
-}
-if not Allowed[Player.UserId] then
-    Player:Kick("Access denied: you are not authorized to run this script.")
-    return
-end
--- =====================================
-
--- === Original Auto Farm logic (unchanged) ===
-local TweenService      = game:GetService("TweenService")
-local RunService        = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TeleportService   = game:GetService("TeleportService")
-
-task.wait(10)
-print("Auto Farm Script Loaded")
-
--- Anti-Fall Protection
-RunService.Stepped:Connect(function()
-    pcall(function()
-        local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-        end
-    end)
-end)
-
-
--- Tween Movement Function
-local function toTarget(startPos, targetPos, targetCFrame)
-    local tweenInfo = TweenInfo.new((targetPos - startPos).Magnitude / 80, Enum.EasingStyle.Quad)
-    local success, err = pcall(function()
-        local tween = TweenService:Create(Player.Character.HumanoidRootPart, tweenInfo, {CFrame = targetCFrame})
-        tween:Play()
-    end)
-    if not success then warn(err) end
-end
-
--- AutoSell Function
-local function autoSell()
-    if Stuff.AutoSell and game.workspace:FindFirstChild("Lobby") then
-        Player.Character.HumanoidRootPart.CFrame = CFrame.new(-418.266968, 25.2, 408.361694)
-        for _, item in pairs(Player.PlayerGui.ScreenGui.Sell.Sell.Inner.Items.Frame.Items:GetChildren()) do
-            if item.Name ~= "UIGridLayout" and not item.Equipped.Visible and not item.RarityBackground.Visible then
-                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer("SellItems", {{"Weapon", item.Name}})
-                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer("SellItems", {{"Armor", item.Name}})
-                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer("SellItems", {{"Ability", item.Name}})
-            end
-        end
+    -- ========= PRIVATE WHITELIST =========
+    local Allowed = {
+        [4070969815] = true, -- replace with your IDs
+        [5036814396] = true,
+    }
+    if not Allowed[Player.UserId] then
+        Player:Kick("Access denied: you are not authorized to run this script.")
+        return
     end
-end
+    -- =====================================
 
--- Dungeon Creation
-spawn(function()
-    while wait() do
+    -- === Original Auto Farm logic (unchanged) ===
+    local TweenService      = game:GetService("TweenService")
+    local RunService        = game:GetService("RunService")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local TeleportService   = game:GetService("TeleportService")
+
+    task.wait(10)
+    print("Auto Farm Script Loaded")
+
+    RunService.Stepped:Connect(function()
         pcall(function()
-            if game.workspace:FindFirstChild("Lobby") then
-                autoSell()
-                local create = "CreateLobby"
-                local start = "StartDungeon"
-                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer(create, Dungeon)
-                ReplicatedStorage.Modules.Network.RemoteEvent:FireServer(start)
+            local humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid:ChangeState(Enum.HumanoidStateType.Physics)
             end
         end)
-    end
-end)
+    end)
 
--- Restart Timer
-local Time = 0
-spawn(function()
-    while wait(1) do
-        if not game.workspace:FindFirstChild("Lobby") then
-            Time = Time + 1
-            if Time >= Stuff.RestartTime then
-                TeleportService:Teleport(4390380541, Player)
+    local function toTarget(startPos, targetPos, targetCFrame)
+        local tweenInfo = TweenInfo.new((targetPos - startPos).Magnitude / 80, Enum.EasingStyle.Quad)
+        local ok, err = pcall(function()
+            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+                tween:Play()
+            end
+        end)
+        if not ok then warn(err) end
+    end
+
+    local function autoSell()
+        if Stuff.AutoSell and game.workspace:FindFirstChild("Lobby") then
+            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CFrame = CFrame.new(-418.266968, 25.2, 408.361694)
+            end
+            local itemsFrame = Player.PlayerGui.ScreenGui.Sell.Sell.Inner.Items.Frame.Items
+            for _, item in pairs(itemsFrame:GetChildren()) do
+                if item.Name ~= "UIGridLayout" and not item.Equipped.Visible and not item.RarityBackground.Visible then
+                    local rf = ReplicatedStorage.Modules.Network.RemoteFunction
+                    rf:InvokeServer("SellItems", {{"Weapon", item.Name}})
+                    rf:InvokeServer("SellItems", {{"Armor", item.Name}})
+                    rf:InvokeServer("SellItems", {{"Ability", item.Name}})
+                end
             end
         end
     end
-end)
 
--- Enemy Farming
-local attackCount = 0
-while wait() do
-    pcall(function()
-        if Player.Character and not game.workspace:FindFirstChild("Lobby") then
-            for _, weaponModel in pairs(Player.Character:GetChildren()) do
-                if weaponModel:IsA("Model") then
-                    for _, enemy in pairs(game.workspace.Enemies:GetChildren()) do
-                        if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
-                            repeat
-                                attackCount = attackCount + 1
-                                -- Float ABOVE enemy (change 5 to adjust height)
-                                toTarget(Player.Character.HumanoidRootPart.Position, enemy.HumanoidRootPart.Position, enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0))
-                                
-                                -- Attack enemy
-                                local remoteEvent = ReplicatedStorage.Modules.Network.RemoteEvent
-                                for i = 1, 10 do
-                                    remoteEvent:FireServer("WeaponDamage", weaponModel.Name, enemy.Humanoid)
-                                end
-                                
-                                wait()
-                                if attackCount >= 100 then
-                                    enemy.Humanoid.Health = 0
-                                end
-                            until enemy.Humanoid.Health <= 0
-                            attackCount = 0
-                        end
-                    end
+    task.spawn(function()
+        while task.wait() do
+            pcall(function()
+                if game.workspace:FindFirstChild("Lobby") then
+                    autoSell()
+                    ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer("CreateLobby", Dungeon)
+                    ReplicatedStorage.Modules.Network.RemoteEvent:FireServer("StartDungeon")
+                end
+            end)
+        end
+    end)
+
+    local Time = 0
+    task.spawn(function()
+        while task.wait(1) do
+            if not game.workspace:FindFirstChild("Lobby") then
+                Time += 1
+                if Time >= Stuff.RestartTime then
+                    TeleportService:Teleport(4390380541, Player)
                 end
             end
         end
     end)
-end
 
+    local attackCount = 0
+    while task.wait() do
+        pcall(function()
+            if Player.Character and not game.workspace:FindFirstChild("Lobby") then
+                for _, weaponModel in pairs(Player.Character:GetChildren()) do
+                    if weaponModel:IsA("Model") then
+                        for _, enemy in pairs(game.workspace.Enemies:GetChildren()) do
+                            if enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") then
+                                repeat
+                                    attackCount += 1
+                                    toTarget(
+                                        Player.Character.HumanoidRootPart.Position,
+                                        enemy.HumanoidRootPart.Position,
+                                        enemy.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                                    )
+                                    local remoteEvent = ReplicatedStorage.Modules.Network.RemoteEvent
+                                    for i = 1, 10 do
+                                        remoteEvent:FireServer("WeaponDamage", weaponModel.Name, enemy.Humanoid)
+                                    end
+                                    task.wait()
+                                    if attackCount >= 100 then
+                                        enemy.Humanoid.Health = 0
+                                    end
+                                until enemy.Humanoid.Health <= 0
+                                attackCount = 0
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end
 
