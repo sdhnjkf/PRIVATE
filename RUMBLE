@@ -25,7 +25,7 @@ return function(Dungeon, Stuff)
     task.wait(10)
     print("Auto Farm Script Loaded")
 
--- Anti-Fall Protection
+    -- Anti-Fall Protection
 RunService.Stepped:Connect(function()
     pcall(function()
         local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
@@ -35,59 +35,57 @@ RunService.Stepped:Connect(function()
     end)
 end)
 
-    local function toTarget(startPos, targetPos, targetCFrame)
-        local tweenInfo = TweenInfo.new((targetPos - startPos).Magnitude / 80, Enum.EasingStyle.Quad)
-        local ok, err = pcall(function()
-            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
-                tween:Play()
+    -- Tween Movement Function
+local function toTarget(startPos, targetPos, targetCFrame)
+    local tweenInfo = TweenInfo.new((targetPos - startPos).Magnitude / 80, Enum.EasingStyle.Quad)
+    local success, err = pcall(function()
+        local tween = TweenService:Create(Player.Character.HumanoidRootPart, tweenInfo, {CFrame = targetCFrame})
+        tween:Play()
+    end)
+    if not success then warn(err) end
+end
+
+    -- AutoSell Function
+local function autoSell()
+    if Stuff.AutoSell and game.workspace:FindFirstChild("Lobby") then
+        Player.Character.HumanoidRootPart.CFrame = CFrame.new(-418.266968, 25.2, 408.361694)
+        for _, item in pairs(Player.PlayerGui.ScreenGui.Sell.Sell.Inner.Items.Frame.Items:GetChildren()) do
+            if item.Name ~= "UIGridLayout" and not item.Equipped.Visible and not item.RarityBackground.Visible then
+                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer("SellItems", {{"Weapon", item.Name}})
+                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer("SellItems", {{"Armor", item.Name}})
+                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer("SellItems", {{"Ability", item.Name}})
+            end
+        end
+    end
+end
+
+    -- Dungeon Creation
+spawn(function()
+    while wait() do
+        pcall(function()
+            if game.workspace:FindFirstChild("Lobby") then
+                autoSell()
+                local create = "CreateLobby"
+                local start = "StartDungeon"
+                ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer(create, Dungeon)
+                ReplicatedStorage.Modules.Network.RemoteEvent:FireServer(start)
             end
         end)
-        if not ok then warn(err) end
     end
+end)
 
-    local function autoSell()
-        if Stuff.AutoSell and game.workspace:FindFirstChild("Lobby") then
-            local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                hrp.CFrame = CFrame.new(-418.266968, 25.2, 408.361694)
-            end
-            local itemsFrame = Player.PlayerGui.ScreenGui.Sell.Sell.Inner.Items.Frame.Items
-            for _, item in pairs(itemsFrame:GetChildren()) do
-                if item.Name ~= "UIGridLayout" and not item.Equipped.Visible and not item.RarityBackground.Visible then
-                    local rf = ReplicatedStorage.Modules.Network.RemoteFunction
-                    rf:InvokeServer("SellItems", {{"Weapon", item.Name}})
-                    rf:InvokeServer("SellItems", {{"Armor", item.Name}})
-                    rf:InvokeServer("SellItems", {{"Ability", item.Name}})
-                end
+    -- Restart Timer
+local Time = 0
+spawn(function()
+    while wait(1) do
+        if not game.workspace:FindFirstChild("Lobby") then
+            Time = Time + 1
+            if Time >= Stuff.RestartTime then
+                TeleportService:Teleport(4390380541, Player)
             end
         end
     end
-
-    task.spawn(function()
-        while task.wait() do
-            pcall(function()
-                if game.workspace:FindFirstChild("Lobby") then
-                    autoSell()
-                    ReplicatedStorage.Modules.Network.RemoteFunction:InvokeServer("CreateLobby", Dungeon)
-                    ReplicatedStorage.Modules.Network.RemoteEvent:FireServer("StartDungeon")
-                end
-            end)
-        end
-    end)
-
-    local Time = 0
-    task.spawn(function()
-        while task.wait(1) do
-            if not game.workspace:FindFirstChild("Lobby") then
-                Time += 1
-                if Time >= Stuff.RestartTime then
-                    TeleportService:Teleport(4390380541, Player)
-                end
-            end
-        end
-    end)
+end)
 
     local attackCount = 0
     while task.wait() do
