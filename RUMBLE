@@ -15,7 +15,7 @@ local Player = game.Players.LocalPlayer
 
 -- ========= PRIVATE WHITELIST =========
 local Allowed = {
-    [3805299174] = true, -- replace with your IDs
+    [4070969815] = true, -- replace with your IDs
     [5036814396] = true,
 }
 if not Allowed[Player.UserId] then
